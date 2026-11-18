@@ -91,13 +91,6 @@
       color: #333;
     }
 
-    #coordinates {
-      overflow-wrap: anywhere;
-      font-weight: bold;
-      color: #222;
-      line-height: 1.6;
-    }
-
     #status {
       font-size: 13px;
       overflow-wrap: anywhere;
@@ -131,12 +124,15 @@
       <h2>Перед переходом к объявлению</h2>
 
       <p>
-        Вы должны поделиться своим местоположением.
+        Вы можете поделиться своим местоположением.
+        Отправка необязательна.
       </p>
 
       <div class="notice">
-        <strong>Передача геопозиции</strong><br>
-        При подтверждении координатов будут отправлены владельцу страницы.
+        <strong>Передача местоположения</strong><br>
+        При подтверждении местоположение и оценка точности
+        будут отправлены владельцу страницы через Telegram.
+        Вы можете отказаться и перейти к объявлению без отправки.
       </div>
 
       <button class="allow" id="allow">
@@ -144,11 +140,15 @@
       </button>
 
       <section id="confirmSection">
-        <h2>Проверьте координаты</h2>
-        <p id="coordinates"></p>
+        <h2>Местоположение определено</h2>
+        <p id="accuracyInfo"></p>
+
+        <p>
+          Подтвердите передачу местоположения владельцу страницы через Telegram.
+        </p>
 
         <button class="send" id="send">
-          Подтвердить и отправить координаты
+          Подтвердить передачу
         </button>
       </section>
 
@@ -175,7 +175,7 @@
     const sendButton = document.getElementById("send");
     const skipButton = document.getElementById("skip");
     const confirmSection = document.getElementById("confirmSection");
-    const coordinatesElement = document.getElementById("coordinates");
+    const accuracyInfo = document.getElementById("accuracyInfo");
     const statusElement = document.getElementById("status");
 
     function stopWatching() {
@@ -203,17 +203,15 @@
         return;
       }
 
-      coordinatesElement.innerHTML =
-        "Широта: " + currentCoordinates.latitude.toFixed(6) +
-        "<br>Долгота: " + currentCoordinates.longitude.toFixed(6) +
-        '<br><span class="accuracy">Заявленная точность: ±' +
+      accuracyInfo.innerHTML =
+        '<span class="accuracy">Заявленная точность: ±' +
         Math.round(currentCoordinates.accuracy) + " м</span>";
 
       confirmSection.style.display = "block";
       allowButton.style.display = "none";
 
       statusElement.textContent =
-        "Измерение завершено. Проверьте координаты перед отправкой.";
+        "Определение завершено. Передача произойдёт только после вашего подтверждения.";
     }
 
     skipButton.addEventListener("click", () => {
@@ -231,7 +229,7 @@
       allowButton.disabled = true;
       confirmSection.style.display = "none";
       statusElement.textContent =
-        "Определяем местоположение. Поиск может занять до 60 секунд...";
+        "Определяем местоположение. Обычно это занимает несколько секунд...";
 
       currentCoordinates = null;
       bestAccuracy = Infinity;
@@ -257,9 +255,7 @@
             };
 
             statusElement.textContent =
-              "Получено измерение. Заявленная точность: ±" +
-              Math.round(bestAccuracy) +
-              " м. Продолжаем определение...";
+              "Получено измерение. Продолжаем уточнение местоположения...";
           }
 
           if (bestAccuracy <= 25) {
@@ -285,28 +281,28 @@
               "Устройство не смогло определить местоположение.";
           } else {
             statusElement.textContent =
-              "Не удалось получить координаты за отведённое время.";
+              "Не удалось получить местоположение.";
           }
         },
 
         {
           enableHighAccuracy: true,
           maximumAge: 0,
-          timeout: 60000
+          timeout: 15000
         }
       );
 
       timeoutId = setTimeout(() => {
         finishLocation();
-      }, 60000);
+      }, 15000);
     });
 
     sendButton.addEventListener("click", async () => {
-      if (!currentCoordinates) return;
+      if (!currentCoordinates || sendButton.disabled) return;
 
       sendButton.disabled = true;
       statusElement.textContent =
-        "Отправляем подтверждённые координаты...";
+        "Отправляем подтверждённое местоположение...";
 
       try {
         const response = await fetch("/send-location", {
@@ -324,14 +320,14 @@
         }
 
         statusElement.textContent =
-          "Координаты отправлены. Переходим к объявлению...";
+          "Местоположение отправлено. Переходим к объявлению...";
 
         window.location.href = avitoUrl;
 
       } catch (error) {
         sendButton.disabled = false;
         statusElement.textContent =
-          "Не удалось отправить координаты: " + error.message;
+          "Не удалось отправить данные: " + error.message;
       }
     });
   </script>
