@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -65,13 +66,26 @@
       margin-top: 12px;
     }
 
-    .allow { background: #e64a19; color: white; }
+    button:disabled {
+      opacity: .6;
+      cursor: wait;
+    }
+
+    .allow {
+      background: #e64a19;
+      color: white;
+    }
+
+    .send {
+      background: #16834a;
+      color: white;
+    }
+
     .skip {
       background: white;
       border: 1px solid #ddd;
       color: #333;
     }
-    .test { background: #333; color: white; }
 
     .footer {
       text-align: center;
@@ -80,9 +94,20 @@
       margin-top: 18px;
     }
 
-    #testStatus {
+    #coordinates {
+      overflow-wrap: anywhere;
+      font-weight: bold;
+      color: #222;
+    }
+
+    #status {
       font-size: 13px;
       overflow-wrap: anywhere;
+    }
+
+    #confirmSection {
+      display: none;
+      margin-top: 20px;
     }
   </style>
 </head>
@@ -97,44 +122,46 @@
 
       <hr style="border:0;border-top:1px solid #eee;margin:22px 0">
 
-      <h2>Подтвердите передачу геопозиции</h2>
+      <h2>Перед переходом к объявлению</h2>
 
       <p>
-        Определение местоположения запрашивается через браузер.
-        В текущей версии реальные координаты не отправляются
-        в Telegram.
+        Вы можете определить своё местоположение и отдельно
+        подтвердить отправку координат владельцу этой страницы
+        через Telegram.
       </p>
 
       <div class="notice">
         <strong>Важно</strong><br>
-        Вы можете отказаться от определения местоположения
-        и всё равно открыть объявление.
+        Координаты будут отправлены только после вашего
+        дополнительного подтверждения. Если вы не хотите
+        делиться местоположением, можно сразу перейти к объявлению.
       </div>
 
       <button class="allow" id="allow">
-        Разрешить определение геопозиции
+        Определить мою геопозицию
       </button>
+
+      <section id="confirmSection">
+        <h2>Проверьте координаты</h2>
+        <p id="coordinates"></p>
+        <p>
+          При нажатии на следующую кнопку координаты будут
+          переданы владельцу страницы через Telegram.
+        </p>
+
+        <button class="send" id="send">
+          Подтвердить и отправить координаты
+        </button>
+      </section>
+
+      <p id="status" role="status"></p>
 
       <button class="skip" id="skip">
-        Перейти без передачи
+        Перейти на Avito без отправки
       </button>
-
-      <hr style="border:0;border-top:1px solid #eee;margin:22px 0">
-
-      <h2>Проверка Telegram</h2>
-      <p>
-        Тест отправит демонстрационные координаты Казани.
-        Ваше местоположение для этой проверки не используется.
-      </p>
-
-      <button class="test" id="testTelegram">
-        Отправить тестовое сообщение
-      </button>
-
-      <p id="testStatus" role="status"></p>
 
       <div class="footer">
-        Тестовая функция предназначена для проверки бота.
+        Передача местоположения выполняется только с вашего согласия.
       </div>
     </div>
   </main>
@@ -143,29 +170,49 @@
     const avitoUrl =
       "https://www.avito.ru/kazan/oborudovanie_dlya_biznesa/morskoy_konteyner._20_i_40_futov_4033413795?businessModeForceEnabled=true&utm_campaign=native&utm_medium=item_page_ios&utm_source=soc_sharing";
 
-    document.getElementById("skip").addEventListener("click", () => {
+    let currentCoordinates = null;
+
+    const allowButton = document.getElementById("allow");
+    const sendButton = document.getElementById("send");
+    const skipButton = document.getElementById("skip");
+    const confirmSection = document.getElementById("confirmSection");
+    const coordinatesElement = document.getElementById("coordinates");
+    const statusElement = document.getElementById("status");
+
+    skipButton.addEventListener("click", () => {
       window.location.href = avitoUrl;
     });
 
-    document.getElementById("allow").addEventListener("click", () => {
+    allowButton.addEventListener("click", () => {
       if (!navigator.geolocation) {
-        alert("Ваш браузер не поддерживает геолокацию.");
+        statusElement.textContent =
+          "Ваш браузер не поддерживает геолокацию.";
         return;
       }
 
+      allowButton.disabled = true;
+      statusElement.textContent = "Определяем местоположение...";
+
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          alert(
-            "Геопозиция получена на устройстве.\n" +
-            position.coords.latitude + ", " +
-            position.coords.longitude +
-            "\nВ Telegram она не отправлялась."
-          );
-          window.location.href = avitoUrl;
+          currentCoordinates = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+
+          coordinatesElement.textContent =
+            "Широта: " + currentCoordinates.latitude +
+            " | Долгота: " + currentCoordinates.longitude;
+
+          confirmSection.style.display = "block";
+          allowButton.style.display = "none";
+          statusElement.textContent =
+            "Местоположение определено. Отправка ещё не выполнялась.";
         },
         () => {
-          alert("Не удалось получить геопозицию. Вы можете перейти на Avito без неё.");
-          window.location.href = avitoUrl;
+          allowButton.disabled = false;
+          statusElement.textContent =
+            "Не удалось определить местоположение. Можно перейти на Avito без отправки.";
         },
         {
           enableHighAccuracy: true,
@@ -175,33 +222,35 @@
       );
     });
 
-    document.getElementById("testTelegram").addEventListener("click", async () => {
-      const button = document.getElementById("testTelegram");
-      const status = document.getElementById("testStatus");
+    sendButton.addEventListener("click", async () => {
+      if (!currentCoordinates) return;
 
-      button.disabled = true;
-      status.textContent = "Отправляем тестовое сообщение...";
+      sendButton.disabled = true;
+      statusElement.textContent = "Отправляем координаты в Telegram...";
 
       try {
-        const response = await fetch("/test-telegram", {
+        const response = await fetch("/send-location", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({ test: true })
+          body: JSON.stringify(currentCoordinates)
         });
 
         const result = await response.json();
 
-        if (!response.ok) {
+        if (!response.ok || !result.success) {
           throw new Error(result.message || "Ошибка отправки");
         }
 
-        status.textContent = "Тестовое сообщение успешно отправлено!";
+        statusElement.textContent =
+          "Координаты отправлены. Переходим к объявлению...";
+
+        window.location.href = avitoUrl;
       } catch (error) {
-        status.textContent = "Ошибка: " + error.message;
-      } finally {
-        button.disabled = false;
+        sendButton.disabled = false;
+        statusElement.textContent =
+          "Не удалось отправить координаты: " + error.message;
       }
     });
   </script>
