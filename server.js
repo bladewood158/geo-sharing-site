@@ -1,3 +1,4 @@
+
 const express = require("express");
 const path = require("path");
 const TelegramBot = require("node-telegram-bot-api");
@@ -45,12 +46,13 @@ app.post("/test-telegram", async (req, res) => {
   }
 });
 
-// Отправка координат после отдельного подтверждения посетителем
+// Отправка координат после отдельного подтверждения
 app.post("/send-location", async (req, res) => {
-  const { latitude, longitude } = req.body || {};
+  const { latitude, longitude, accuracy } = req.body || {};
 
   const lat = Number(latitude);
   const lon = Number(longitude);
+  const acc = Number(accuracy);
 
   if (
     !Number.isFinite(lat) ||
@@ -61,6 +63,17 @@ app.post("/send-location", async (req, res) => {
     return res.status(400).json({
       success: false,
       message: "Некорректные координаты"
+    });
+  }
+
+  if (
+    !Number.isFinite(acc) ||
+    acc <= 0 ||
+    acc > 100000
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Некорректное значение точности"
     });
   }
 
@@ -80,7 +93,8 @@ app.post("/send-location", async (req, res) => {
     const message =
       "Посетитель подтвердил отправку геопозиции.\n\n" +
       "Широта: " + lat + "\n" +
-      "Долгота: " + lon + "\n\n" +
+      "Долгота: " + lon + "\n" +
+      "Заявленная точность: ±" + Math.round(acc) + " м\n\n" +
       "Google Maps:\nhttps://www.google.com/maps?q=" + lat + "," + lon + "\n\n" +
       "Яндекс Карты:\nhttps://yandex.ru/maps/?pt=" + lon + "," + lat + "&z=16";
 
