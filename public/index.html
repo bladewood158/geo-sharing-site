@@ -140,10 +140,6 @@
         <h2>Местоположение определено</h2>
         <p id="accuracyInfo"></p>
 
-        <p>
-          Подтвердить
-        </p>
-
         <button class="send" id="send">
           Подтвердить передачу
         </button>
@@ -285,13 +281,13 @@
         {
           enableHighAccuracy: true,
           maximumAge: 0,
-          timeout: 8000
+          timeout: 5000
         }
       );
 
       timeoutId = setTimeout(() => {
         finishLocation();
-      }, 8000);
+      }, 5000);
     });
 
     sendButton.addEventListener("click", async () => {
