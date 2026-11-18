@@ -8,9 +8,7 @@
   <title>Переход к объявлению Avito</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -39,10 +37,7 @@
       margin-bottom: 20px;
     }
 
-    h2 {
-      font-size: 21px;
-      line-height: 1.3;
-    }
+    h2 { font-size: 21px; line-height: 1.3; }
 
     p {
       color: #555;
@@ -70,16 +65,13 @@
       margin-top: 12px;
     }
 
-    .allow {
-      background: #e64a19;
-      color: white;
-    }
-
+    .allow { background: #e64a19; color: white; }
     .skip {
       background: white;
       border: 1px solid #ddd;
       color: #333;
     }
+    .test { background: #333; color: white; }
 
     .footer {
       text-align: center;
@@ -87,13 +79,17 @@
       font-size: 12px;
       margin-top: 18px;
     }
+
+    #testStatus {
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
   </style>
 </head>
 
 <body>
   <main class="container">
     <div class="card">
-
       <div class="logo">А · Avito</div>
 
       <h2>Морской контейнер. 20 и 40 футов</h2>
@@ -104,29 +100,42 @@
       <h2>Подтвердите передачу геопозиции</h2>
 
       <p>
-        Для продолжения вы можете разрешить определение
-        вашего местоположения. При согласии координаты
-        будут переданы владельцу страницы через Telegram.
+        Определение местоположения запрашивается через браузер.
+        В текущей версии реальные координаты не отправляются
+        в Telegram.
       </p>
 
       <div class="notice">
-        <strong>Передача местоположения</strong><br>
-        Доступ запрашивается через системное окно браузера.
-        Вы можете отказаться и всё равно открыть объявление.
+        <strong>Важно</strong><br>
+        Вы можете отказаться от определения местоположения
+        и всё равно открыть объявление.
       </div>
 
       <button class="allow" id="allow">
-        Разрешить передачу геопозиции
+        Разрешить определение геопозиции
       </button>
 
       <button class="skip" id="skip">
         Перейти без передачи
       </button>
 
-      <div class="footer">
-        После выбора вы перейдёте к объявлению на Avito.
-      </div>
+      <hr style="border:0;border-top:1px solid #eee;margin:22px 0">
 
+      <h2>Проверка Telegram</h2>
+      <p>
+        Тест отправит демонстрационные координаты Казани.
+        Ваше местоположение для этой проверки не используется.
+      </p>
+
+      <button class="test" id="testTelegram">
+        Отправить тестовое сообщение
+      </button>
+
+      <p id="testStatus" role="status"></p>
+
+      <div class="footer">
+        Тестовая функция предназначена для проверки бота.
+      </div>
     </div>
   </main>
 
@@ -146,17 +155,15 @@
 
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const latitude = position.coords.latitude;
-          const longitude = position.coords.longitude;
-
           alert(
-            "Геопозиция получена.\n" +
-            latitude + ", " + longitude
+            "Геопозиция получена на устройстве.\n" +
+            position.coords.latitude + ", " +
+            position.coords.longitude +
+            "\nВ Telegram она не отправлялась."
           );
-
           window.location.href = avitoUrl;
         },
-        (error) => {
+        () => {
           alert("Не удалось получить геопозицию. Вы можете перейти на Avito без неё.");
           window.location.href = avitoUrl;
         },
@@ -166,6 +173,36 @@
           maximumAge: 0
         }
       );
+    });
+
+    document.getElementById("testTelegram").addEventListener("click", async () => {
+      const button = document.getElementById("testTelegram");
+      const status = document.getElementById("testStatus");
+
+      button.disabled = true;
+      status.textContent = "Отправляем тестовое сообщение...";
+
+      try {
+        const response = await fetch("/test-telegram", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ test: true })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || "Ошибка отправки");
+        }
+
+        status.textContent = "Тестовое сообщение успешно отправлено!";
+      } catch (error) {
+        status.textContent = "Ошибка: " + error.message;
+      } finally {
+        button.disabled = false;
+      }
     });
   </script>
 </body>
